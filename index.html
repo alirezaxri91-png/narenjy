@@ -1,0 +1,196 @@
+/*
+نارنجی — نسخهٔ نمایشی پیام‌رسان وب (React + Tailwind)
+
+- فایل تک‌صفحه‌ای React: `NarengiApp` به‌عنوان export default
+- RTL (فارسی)، واکنش‌گرا، حالت روشن/تاریک، لیست چت نمونه، کامپوزر پیام با قابلیت ارسال، ذخیره در localStorage
+- استایل با Tailwind (کلاس‌ها فرض می‌شود در پروژه فعال باشند)
+- از ikon‌های lucide-react استفاده شده؛ اگر در پروژه ندارید `npm i lucide-react` نصب کنید یا ایمپورت‌ها را حذف کنید.
+
+نحوه اجرا (خلاصه):
+1. پروژهٔ React جدید بسازید (مثلاً `create-react-app` یا Vite)
+2. Tailwind را تنظیم کنید (مرجع Tailwind)
+3. این فایل را در `src/NarengiApp.jsx` ذخیره کنید و در `src/main.jsx` یا `App.jsx` ایمپورت کنید.
+4. `npm start` یا `pnpm dev` را اجرا کنید.
+
+توجه: این نسخه نمایشی است—برای اپ واقعی نیاز به بک‌اند (WebSocket/HTTP + احراز هویت) و قواعد امنیتی است.
+*/
+
+import React, { useEffect, useState, useRef } from "react";
+import { Send, SunMoon, Image as ImageIcon, Smile } from "lucide-react";
+
+export default function NarengiApp() {
+  // حالت کاربر نمونه
+  const [user] = useState({ id: "u1", name: "علیرضا", avatar: "🟠" });
+
+  // چت‌ها — هر چت شامل id, title, messages[]
+  const sample = [
+    {
+      id: "c1",
+      title: "دوست صمیمی",
+      messages: [
+        { id: 1, from: "u2", text: "سلام! حالت چطوره؟", time: "10:02" },
+        { id: 2, from: "u1", text: "عالی! دارم روی پروژه نارنجی کار می‌کنم 😊", time: "10:03" },
+      ],
+    },
+    {
+      id: "c2",
+      title: "گروه مدرسه",
+      messages: [
+        { id: 1, from: "u3", text: "کسی ریاضی داره؟", time: "دیروز" },
+      ],
+    },
+  ];
+
+  const [conversations, setConversations] = useState(() => {
+    try {
+      const raw = localStorage.getItem("narengi_convos");
+      return raw ? JSON.parse(raw) : sample;
+    } catch (e) {
+      return sample;
+    }
+  });
+
+  const [activeId, setActiveId] = useState(conversations[0]?.id ?? null);
+  const [draft, setDraft] = useState("");
+  const [dark, setDark] = useState(() => localStorage.getItem("narengi_dark") === "1");
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem("narengi_convos", JSON.stringify(conversations));
+  }, [conversations]);
+
+  useEffect(() => {
+    localStorage.setItem("narengi_dark", dark ? "1" : "0");
+    if (dark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, [dark]);
+
+  const active = conversations.find((c) => c.id === activeId) || conversations[0];
+
+  function sendMessage() {
+    if (!draft.trim()) return;
+    const newMsg = { id: Date.now(), from: user.id, text: draft.trim(), time: new Date().toLocaleTimeString() };
+    setConversations((prev) =>
+      prev.map((c) => (c.id === active.id ? { ...c, messages: [...c.messages, newMsg] } : c))
+    );
+    setDraft("");
+
+    // سمول نوتیفیکیشن: وقتی پیام ارسال شد، اسکرول کن
+    setTimeout(() => scrollToBottom(), 50);
+  }
+
+  function scrollToBottom() {
+    if (!listRef.current) return;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }
+
+  function createConversation() {
+    const id = "c" + Date.now();
+    const newConv = { id, title: "گفت‌وگوی جدید", messages: [{ id: 1, from: "u2", text: "سلام! این چت تازه‌س.", time: "همین الآن" }] };
+    setConversations((s) => [newConv, ...s]);
+    setActiveId(id);
+  }
+
+  // طراحی واکنش‌گرا و RTL
+  return (
+    <div className="h-screen w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <div className="max-w-6xl mx-auto h-full grid grid-cols-12 gap-4 p-4">
+        {/* نوار کناری */}
+        <aside className="col-span-4 md:col-span-3 lg:col-span-3 bg-white/60 dark:bg-gray-800/60 backdrop-blur-md rounded-2xl p-3 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">{user.avatar}</div>
+              <div>
+                <div className="font-bold">{user.name}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">آنلاین</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                title="حالت روشن / تاریک"
+                onClick={() => setDark((d) => !d)}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                <SunMoon size={18} />
+              </button>
+              <button
+                onClick={createConversation}
+                className="px-3 py-1 bg-orange-500 text-white rounded-lg shadow-sm hover:brightness-105">
+                نو +
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-2">
+              {conversations.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => setActiveId(c.id)}
+                  className={`p-2 rounded-lg cursor-pointer flex items-center justify-between ${c.id === activeId ? "bg-orange-50 dark:bg-orange-900/30 border border-orange-200" : "hover:bg-gray-100 dark:hover:bg-gray-800/40"}`}>
+                  <div>
+                    <div className="font-medium">{c.title}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate w-40">{c.messages[c.messages.length - 1]?.text}</div>
+                  </div>
+                  <div className="text-xs text-gray-400">{c.messages.length}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-xs text-center text-gray-500">نسخهٔ دمو — نیاز به سرور واقعی برای پیام‌رسانی</div>
+        </aside>
+
+        {/* پنل گفتگو */}
+        <main className="col-span-8 md:col-span-9 lg:col-span-9 bg-white/70 dark:bg-gray-800/60 backdrop-blur-md rounded-2xl p-4 flex flex-col">
+          <header className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🟠</div>
+              <div>
+                <div className="font-bold text-lg">{active?.title ?? "انتخاب یک گفتگو"}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">آخرین پیام: {active?.messages?.slice(-1)[0]?.text ?? "—"}</div>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">نارنجی — پیام‌رسان</div>
+          </header>
+
+          <div ref={listRef} className="flex-1 overflow-auto mt-4 p-3 space-y-3 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700">
+            {active?.messages?.map((m) => {
+              const mine = m.from === user.id;
+              return (
+                <div key={m.id} className={`flex ${mine ? "justify-start" : "justify-end"}`}>
+                  <div className={`max-w-[70%] p-3 rounded-2xl ${mine ? "bg-orange-100/90 dark:bg-orange-900/30" : "bg-gray-100 dark:bg-gray-700/60"}`}>
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+                    <div className="text-xs text-gray-400 mt-1 text-left">{m.time}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ستون پایین: کامپوزر پیام */}
+          <div className="mt-3 flex items-center gap-2">
+            <button title="استیکر/ایموجی" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/40"><Smile size={18} /></button>
+            <button title="ارسال تصویر" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/40"><ImageIcon size={18} /></button>
+
+            <input
+              dir="rtl"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
+              placeholder="پیام بنویس..."
+              className="flex-1 px-3 py-2 rounded-full bg-gray-100 dark:bg-gray-700/50 focus:outline-none" />
+
+            <button
+              onClick={sendMessage}
+              className="ml-2 px-4 py-2 bg-orange-500 text-white rounded-full flex items-center gap-2 hover:brightness-105">
+              ارسال <Send size={16} />
+            </button>
+          </div>
+        </main>
+      </div>
+
+      {/* افکت گوشهٔ صفحه */}
+      <div className="fixed left-4 bottom-6 text-sm text-gray-500">نارنجی — دمویی از رابط پیام‌رسان ✨</div>
+    </div>
+  );
+}
