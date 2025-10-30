@@ -3,22 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🍊 نارنجی چت</title>
+  <title>🍊 پیام‌رسان نارنجی</title>
   <style>
     body {
       font-family: 'Vazirmatn', sans-serif;
-      background: linear-gradient(135deg, #ffb347, #ffcc33);
+      background: linear-gradient(135deg, #ffa931, #ffcc33);
       height: 100vh;
       margin: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: flex-start;
+    }
+    h1 {
+      margin-top: 30px;
+      color: #fff;
+      text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
     }
     #chat-box {
       width: 90%;
       max-width: 500px;
-      height: 70vh;
-      background: white;
+      height: 65vh;
+      background: #fff;
       border-radius: 15px;
       overflow-y: auto;
       padding: 10px;
@@ -32,6 +38,7 @@
       border-radius: 10px;
       outline: none;
       font-size: 16px;
+      background: #fff8e1;
     }
     #send-btn {
       padding: 10px 15px;
@@ -40,26 +47,42 @@
       border: none;
       border-radius: 10px;
       cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    #send-btn:hover {
+      background: #ff9100;
     }
     #login-btn {
       background: #ff7b00;
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 10px 25px;
       border-radius: 15px;
       cursor: pointer;
       margin-top: 20px;
       font-size: 16px;
+      transition: 0.3s;
+    }
+    #login-btn:hover {
+      background: #ff9100;
     }
     .message {
-      background: #ffe6b3;
+      background: #fff3cd;
       padding: 8px 12px;
       border-radius: 10px;
       margin: 5px 0;
+      word-wrap: break-word;
     }
     .sender {
       font-weight: bold;
       color: #ff7b00;
+    }
+    #error-box {
+      color: red;
+      font-size: 14px;
+      margin-top: 10px;
+      display: none;
     }
   </style>
 </head>
@@ -67,6 +90,7 @@
 
   <h1>🍊 پیام‌رسان نارنجی</h1>
   <button id="login-btn">ورود با گوگل</button>
+  <p id="error-box"></p>
 
   <div id="chat-box"></div>
 
@@ -77,23 +101,21 @@
 
   <!-- Firebase -->
   <script type="module">
-    // Import SDKs
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-    // 🔥 تنظیمات خودت از Firebase Console بگذار
+    // 🍊 تنظیمات مخصوص پروژه‌ات در Firebase
     const firebaseConfig = {
       apiKey: "YOUR_API_KEY",
       authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
       projectId: "YOUR_PROJECT_ID",
       storageBucket: "YOUR_PROJECT_ID.appspot.com",
       messagingSenderId: "YOUR_SENDER_ID",
       appId: "YOUR_APP_ID"
     };
 
-    // Initialize
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const auth = getAuth(app);
@@ -104,24 +126,31 @@
     const messageInput = document.getElementById("message-input");
     const sendBtn = document.getElementById("send-btn");
     const chatControls = document.getElementById("chat-controls");
+    const errorBox = document.getElementById("error-box");
 
     let user = null;
 
-    loginBtn.addEventListener("click", () => {
-      signInWithPopup(auth, provider)
-        .then(result => {
-          user = result.user;
-          loginBtn.style.display = "none";
-          chatControls.style.display = "block";
-        })
-        .catch(console.error);
+    // ورود با گوگل
+    loginBtn.addEventListener("click", async () => {
+      try {
+        const result = await signInWithPopup(auth, provider);
+        user = result.user;
+        loginBtn.style.display = "none";
+        chatControls.style.display = "block";
+        errorBox.style.display = "none";
+      } catch (error) {
+        console.error(error);
+        errorBox.textContent = "⚠️ خطا در ورود! لطفاً دامنه را در Firebase Authorized Domains اضافه کن.";
+        errorBox.style.display = "block";
+      }
     });
 
+    // ارسال پیام
     sendBtn.addEventListener("click", () => {
       const text = messageInput.value.trim();
       if (text && user) {
         push(ref(db, "messages"), {
-          name: user.displayName,
+          name: user.displayName || "ناشناس",
           text: text,
           time: Date.now()
         });
@@ -129,6 +158,7 @@
       }
     });
 
+    // نمایش پیام‌ها به‌صورت زنده
     onChildAdded(ref(db, "messages"), snapshot => {
       const msg = snapshot.val();
       const div = document.createElement("div");
